@@ -4,10 +4,15 @@ import Main from "./components/Main";
 import Loader from "./components/Loader";
 import Error from "./components/Error";
 import StartScreen from "./components/StartScreen";
+import Question from "./components/Question";
+import NextQuestion from "./components/NextQuestion";
 
 const initialState = {
-  question: [],
+  questions: [],
   status: "loading", //loading, error, active, finished
+  currIndex: 0,
+  answer: null,
+  points: 0,
 };
 
 function reducer(state, action) {
@@ -16,14 +21,31 @@ function reducer(state, action) {
       return { ...state, questions: action.payload, status: "ready" };
     case "dataFailed":
       return { ...state, status: "error" };
+    case "startQuiz":
+      return { ...state, status: "active" };
+    case "newAnswer":
+      const question = state.questions.at(state.currIndex);
+
+      return {
+        ...state,
+        answer: action.payload,
+        points:
+          action.payload == question.correctOption
+            ? state.points + question.points
+            : state.points,
+      };
+    case "nextQues":
+      return { ...state, currIndex: state.currIndex + 1, answer: null };
     default:
       throw new Error("Action unknown");
   }
 }
 
 function App() {
-  const [{ status, questions }, dispatch] = useReducer(reducer, initialState);
-  const numQuestions = questions.length;
+  const [{ status, questions, currIndex, answer }, dispatch] = useReducer(
+    reducer,
+    initialState,
+  );
 
   useEffect(function () {
     fetch("http://localhost:8000/questions")
@@ -32,13 +54,27 @@ function App() {
       .catch((err) => dispatch({ type: "dataFailed" }));
   }, []);
 
+  const numQuestions = questions.length;
+
   return (
     <div className="app">
       <Header />
       <Main>
         {status === "loading" && <Loader />}
         {status === "error" && <Error />}
-        {status === "ready" && <StartScreen numQ={numQuestions} />}
+        {status === "ready" && (
+          <StartScreen numQuestions={numQuestions} dispatch={dispatch} />
+        )}
+        {status === "active" && (
+          <>
+            <Question
+              question={questions[currIndex]}
+              dispatch={dispatch}
+              answer={answer}
+            />
+            {answer !== null && <NextQuestion dispatch={dispatch} />}
+          </>
+        )}
       </Main>
     </div>
   );
